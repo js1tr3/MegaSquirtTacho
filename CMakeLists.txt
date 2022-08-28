@@ -18,8 +18,7 @@ project(MegaSquirtTacho C CXX ASM)
 pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
-
-add_executable(MegaSquirtTacho MegaSquirtTacho.c )
+add_executable(MegaSquirtTacho MegaSquirtTacho.cpp include/mcp2515/mcp2515.cpp)
 
 pico_set_program_name(MegaSquirtTacho "MegaSquirtTacho")
 pico_set_program_version(MegaSquirtTacho "0.1")
@@ -27,15 +26,14 @@ pico_set_program_version(MegaSquirtTacho "0.1")
 pico_enable_stdio_uart(MegaSquirtTacho 0)
 pico_enable_stdio_usb(MegaSquirtTacho 1)
 
-# Add the standard library to the build
-target_link_libraries(MegaSquirtTacho pico_stdlib)
-
 # Add any user requested libraries
 target_link_libraries(MegaSquirtTacho
+        pico_stdlib
         hardware_spi
         hardware_i2c
         hardware_timer
         hardware_watchdog
+        hardware_pwm
         )
 
 pico_add_extra_outputs(MegaSquirtTacho)
