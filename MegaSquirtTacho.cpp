@@ -10,7 +10,7 @@
 #include "hardware/pwm.h"
 #include "include/mcp2515/mcp2515.h"
 #include "hardware/clocks.h"
-
+#include "megasquirt_simplified_dash_broadcast.h"
 MCP2515 can0;
 struct can_frame rx;
 // UART defines
@@ -57,10 +57,10 @@ int64_t alarm_callback(alarm_id_t id, void *user_data) {
 int main()
 {
     __uint16_t RPM=0;
-    const uint32_t f_pwm = 200; // frequency we want to generate
+    megasquirt_simplified_dash_broadcast_megasquirt_dash0_t dash0_data;
+    const uint32_t f_pwm = 3000; // frequency we want to generate
 	uint16_t duty = 60; // duty cycle, in percent
     stdio_init_all();
-
     // Set up our UART
     //uart_init(UART_ID, BAUD_RATE);
     // Set the TX and RX pins by using the function select on the GPIO
@@ -85,9 +85,9 @@ int main()
 
 // determine top given Hz - assumes free-running counter rather than phase-correct
 	uint32_t  f_sys = clock_get_hz(clk_sys); // typically 125'000'000 Hz
-	float divider = f_sys / 1'000'000UL;  // let's arbitrarily choose to run pwm clock at 1MHz
+	float divider = f_sys / 1000000UL;  // let's arbitrarily choose to run pwm clock at 1MHz
 	pwm_set_clkdiv(slice_num, divider); // pwm clock should now be running at 1MHz
-	uint32_t top =  1'000'000UL/f_pwm -1; // TOP is u16 has a max of 65535, being 65536 cycles
+	uint32_t top =  1000000UL/f_pwm -1; // TOP is u16 has a max of 65535, being 65536 cycles
 	pwm_set_wrap(slice_num, top);
 
 	// set duty cycle
@@ -109,16 +109,16 @@ int main()
     // over the divider (and support for 64 bit divides), and of course by default regular C language integer
     // divisions are redirected thru that library, meaning you can just use C level `/` and `%` operators and
     // gain the benefits of the fast hardware divider.
-    int32_t dividend = 123456;
-    int32_t divisor = -321;
-    // This is the recommended signed fast divider for general use.
-    divmod_result_t result = hw_divider_divmod_s32(dividend, divisor);
-    printf("%d/%d = %d remainder %d\n", dividend, divisor, to_quotient_s32(result), to_remainder_s32(result));
-    // This is the recommended unsigned fast divider for general use.
-    int32_t udividend = 123456;
-    int32_t udivisor = 321;
-    divmod_result_t uresult = hw_divider_divmod_u32(udividend, udivisor);
-    printf("%d/%d = %d remainder %d\n", udividend, udivisor, to_quotient_u32(uresult), to_remainder_u32(uresult));
+    // int32_t dividend = 123456;
+    // int32_t divisor = -321;
+    // // This is the recommended signed fast divider for general use.
+    // divmod_result_t result = hw_divider_divmod_s32(dividend, divisor);
+    // printf("%d/%d = %d remainder %d\n", dividend, divisor, to_quotient_s32(result), to_remainder_s32(result));
+    // // This is the recommended unsigned fast divider for general use.
+    // int32_t udividend = 123456;
+    // int32_t udivisor = 321;
+    // divmod_result_t uresult = hw_divider_divmod_u32(udividend, udivisor);
+    // printf("%d/%d = %d remainder %d\n", udividend, udivisor, to_quotient_u32(uresult), to_remainder_u32(uresult));
 
     // SPI initialisation. This example will use SPI at 1MHz.
     spi_init(SPI_PORT, 1000*1000);
@@ -169,7 +169,13 @@ int main()
     while(true) {
         if(can0.readMessage(&rx) == MCP2515::ERROR_OK) {
             printf("New frame from ID: %10x\n", rx.can_id);
-
+            if(rx.can_id==MEGASQUIRT_SIMPLIFIED_DASH_BROADCAST_MEGASQUIRT_DASH0_FRAME_ID)
+            {
+                megasquirt_simplified_dash_broadcast_megasquirt_dash0_unpack(&dash0_data, rx.data,rx.can_dlc);
+                // decode RPM signal
+                RPM=dash0_data.rpm;
+                printf("RPM is %d\n", RPM);
+            }
         }
         int16_t ch = getchar_timeout_us(100);
         if(ch != PICO_ERROR_TIMEOUT) {

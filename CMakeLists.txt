@@ -18,7 +18,7 @@ project(MegaSquirtTacho C CXX ASM)
 pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
-add_executable(MegaSquirtTacho MegaSquirtTacho.cpp include/mcp2515/mcp2515.cpp)
+add_executable(MegaSquirtTacho MegaSquirtTacho.cpp megasquirt_simplified_dash_broadcast.c include/mcp2515/mcp2515.cpp)
 
 pico_set_program_name(MegaSquirtTacho "MegaSquirtTacho")
 pico_set_program_version(MegaSquirtTacho "0.1")
