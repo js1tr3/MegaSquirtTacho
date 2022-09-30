@@ -11,8 +11,9 @@
 #include "include/mcp2515/mcp2515.h"
 #include "hardware/clocks.h"
 #include "megasquirt_simplified_dash_broadcast.h"
-MCP2515 can0;
+
 struct can_frame rx;
+struct can_frame tx;
 // UART defines
 // By default the stdout UART is `uart0`, so we will use the second one
 //#define UART_ID uart1
@@ -36,8 +37,16 @@ struct can_frame rx;
 #define PIN_MISO 4
 #define PIN_CS   9
 #define PIN_SCK  2
-#define PIN_MOSI 13
-
+#define PIN_MOSI 3
+MCP2515 can0(SPI_PORT,PIN_CS,PIN_MOSI,PIN_MISO,PIN_SCK,10000000UL);
+//  MCP2515(
+//             spi_inst_t* CHANNEL = spi0,
+//             uint8_t CS_PIN = PICO_DEFAULT_SPI_CSN_PIN,
+//             uint8_t TX_PIN = PICO_DEFAULT_SPI_TX_PIN,
+//             uint8_t RX_PIN = PICO_DEFAULT_SPI_RX_PIN,
+//             uint8_t SCK_PIN = PICO_DEFAULT_SPI_SCK_PIN,
+//             uint32_t _SPI_CLOCK = DEFAULT_SPI_CLOCK
+//         );
 #define Tacho_PIN 24
 // I2C defines
 // This example will use I2C0 on GPIO8 (SDA) and GPIO9 (SCL) running at 400KHz.
@@ -46,10 +55,10 @@ struct can_frame rx;
 #define I2C_SDA 6
 #define I2C_SCL 7
 
-int64_t alarm_callback(alarm_id_t id, void *user_data) {
-    // Put your timeout handler code in here
-    return 0;
-}
+// int64_t alarm_callback(alarm_id_t id, void *user_data) {
+//     // Put your timeout handler code in here
+//     return 0;
+// }
 
 #define PWM_1k 1000
 #define PWM_5k 65535
@@ -58,7 +67,7 @@ int main()
 {
     __uint16_t RPM=0;
     megasquirt_simplified_dash_broadcast_megasquirt_dash0_t dash0_data;
-    const uint32_t f_pwm = 3000; // frequency we want to generate
+    const uint32_t f_pwm = 15000; // frequency we want to generate
 	uint16_t duty = 60; // duty cycle, in percent
     stdio_init_all();
     // Set up our UART
@@ -85,9 +94,9 @@ int main()
 
 // determine top given Hz - assumes free-running counter rather than phase-correct
 	uint32_t  f_sys = clock_get_hz(clk_sys); // typically 125'000'000 Hz
-	float divider = f_sys / 1000000UL;  // let's arbitrarily choose to run pwm clock at 1MHz
+	float divider = f_sys / 10000000UL;  // let's arbitrarily choose to run pwm clock at 1MHz
 	pwm_set_clkdiv(slice_num, divider); // pwm clock should now be running at 1MHz
-	uint32_t top =  1000000UL/f_pwm -1; // TOP is u16 has a max of 65535, being 65536 cycles
+	uint32_t top =  10000000UL/f_pwm -1; // TOP is u16 has a max of 65535, being 65536 cycles
 	pwm_set_wrap(slice_num, top);
 
 	// set duty cycle
@@ -120,28 +129,28 @@ int main()
     // divmod_result_t uresult = hw_divider_divmod_u32(udividend, udivisor);
     // printf("%d/%d = %d remainder %d\n", udividend, udivisor, to_quotient_u32(uresult), to_remainder_u32(uresult));
 
-    // SPI initialisation. This example will use SPI at 1MHz.
-    spi_init(SPI_PORT, 1000*1000);
-    gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
-    gpio_set_function(PIN_CS,   GPIO_FUNC_SIO);
-    gpio_set_function(PIN_SCK,  GPIO_FUNC_SPI);
-    gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
+    // // SPI initialisation. This example will use SPI at 1MHz.
+    // spi_init(SPI_PORT, 1000*1000);
+    // gpio_set_function(PIN_MISO, GPIO_FUNC_SPI);
+    // gpio_set_function(PIN_CS,   GPIO_FUNC_SIO);
+    // gpio_set_function(PIN_SCK,  GPIO_FUNC_SPI);
+    // gpio_set_function(PIN_MOSI, GPIO_FUNC_SPI);
     
     // Chip select is active-low, so we'll initialise it to a driven-high state
-    gpio_set_dir(PIN_CS, GPIO_OUT);
-    gpio_put(PIN_CS, 1);
+    // gpio_set_dir(PIN_CS, GPIO_OUT);
+    // gpio_put(PIN_CS, 1);
     
 
     // I2C Initialisation. Using it at 400Khz.
-    i2c_init(I2C_PORT, 400*1000);
+    // i2c_init(I2C_PORT, 400*1000);
     
-    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
-    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
-    gpio_pull_up(I2C_SDA);
-    gpio_pull_up(I2C_SCL);
+    // gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
+    // gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
+    // gpio_pull_up(I2C_SDA);
+    // gpio_pull_up(I2C_SCL);
 
     // Timer example code - This example fires off the callback after 2000ms
-    add_alarm_in_ms(2000, alarm_callback, NULL, false);
+    //add_alarm_in_ms(2000, alarm_callback, NULL, false);
 
     sleep_ms(3000); // 0.5s delay
     puts("Hello, world!");
@@ -150,7 +159,11 @@ int main()
     can0.reset();
     can0.setBitrate(CAN_500KBPS, MCP_16MHZ);
     can0.setNormalMode();
-
+    tx.can_dlc=8;
+    tx.can_id=0x21;
+    tx.data[0]=0x11;
+    
+    printf("tx status %d \n", can0.sendMessage(&tx));
     //     while(1){
     //     gpio_put(GPIO_O, 1); // Set pin 25 to high
     //     printf("LED ON!\n");
@@ -239,6 +252,8 @@ int main()
                 uint16_t level = (top+1) * duty / 100 -1; // calculate channel level from given duty cycle in %
                 pwm_set_chan_level(slice_num, 0, level);
                 printf("PWM: %d duty and level=%d\n",duty,level);
+                tx.data[0]=duty;
+                can0.sendMessage(&tx);
             }
             if(duty==0){
                 uint16_t level = 0; // calculate channel level from given duty cycle in %
